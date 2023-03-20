@@ -44,7 +44,7 @@
   select.
 
   This mechanism is used by the Oric to test for errors; When reading or deleting a file,
-  if file does not exist, file server goes busy for 250ms so the Oric times out.
+  if file does not exist, file server goes busy for 500ms so the Oric times out.
   When reading or writing bytes, the Oric will de-deselect the file server when done.
 
   Data is sent to/from the Oric nibble (4 bits) at a time, synchronised by the Clock pin
