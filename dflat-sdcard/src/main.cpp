@@ -316,6 +316,7 @@ void dflat_close() {
 }
 
 void dflat_directory() {
+  char dirStr[40];
   BUSY;
 
   dir=SD.open("/");     // Always just show the root folder - simples
@@ -332,7 +333,8 @@ void dflat_directory() {
       break;
     }
     if (!myFile.isDirectory()) {
-      char *ptr=myFile.name();
+      sprintf(dirStr,"%-13s%-5u ",myFile.name(),(unsigned int)myFile.size());
+      char *ptr=dirStr;
       while(*ptr!=0) {
         char c=*ptr++;
         READY;
@@ -340,12 +342,13 @@ void dflat_directory() {
           if(!dflat_sd_cs())
             return;    
       }
-      dflat_write_byte(0xd);    
+//      dflat_write_byte(0xd);    
     }
     myFile.close();
   }
   dir.close();
   READY;
+  dflat_write_byte(0xd);    
   dflat_write_byte(0x0);
   state=dflat_initialise;
 }
@@ -361,7 +364,7 @@ void dflat_delete() {
     Serial.println("File Error");
 #endif
     state=dflat_initialise;
-    delay(250);
+    delay(500);
     return;
   }
   SD.remove(dflat_fname);
@@ -399,7 +402,7 @@ void dflat_get_command() {
 #endif
       state=dflat_initialise;
       BUSY;
-      delay(250);
+      delay(500);
       break;
   }
 }
