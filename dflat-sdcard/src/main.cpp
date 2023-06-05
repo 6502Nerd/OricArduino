@@ -70,6 +70,9 @@
 //#define DFLATSER
 
 File myFile, dir;
+char path[100];
+char dflat_fqname[120];
+char dflat_fname[20];
 
 // change this to match your SD shield or module;
 // Arduino Ethernet shield: pin 4
@@ -90,9 +93,8 @@ void dflat_wait_for_select();
 void dflat_get_command();
 void dflat_save_byte();
 void dflat_load_byte();
+void dflat_send_cr();
 
-// filename of sd card file
-char dflat_fname[20];
 
 
 // Initial state when not selected
@@ -164,8 +166,6 @@ void dflat_set_read() {
   pinMode(PIN_PA4, INPUT);
 
 }
-
-
 
 // Read a byte
 int dflat_read_byte() {
@@ -247,13 +247,64 @@ void dflat_get_filename() {
 #endif
 }
 
+// Used as a dummy when opening directory
+void dflat_send_cr() {
+#ifdef DFLATSER
+  Serial.println("Opening directory");
+#endif
+  // Send $ first
+  READY;
+  dflat_write_byte('$');
+  BUSY;
+  // Send 9 bytes header
+  for (int i=0;i<9;i++) {
+    READY;
+    dflat_write_byte('X');
+    BUSY;
+  }
+  // Send nul terminated filename
+  READY;
+  dflat_write_byte(0x0);
+  BUSY;
+  // Send Block 00
+  READY;
+  dflat_write_byte(0x0);
+  BUSY;
+  READY;
+  dflat_write_byte(0x0);
+  BUSY;
+  // Send CR as block of 256 bytes
+  for (int i=0;i<256;i++) {
+    READY;
+    dflat_write_byte(0xd);
+    BUSY;
+  }
+  // If going back to root
+  if (strcmp(dflat_fname,"/")==0) {
+    strcpy(path,"/");         // Initialie as root
+  }
+  else {
+    strcat(path,myFile.name());
+    strcat(path,"/");
+  }
+  READY;
+  dflat_close();
+
+}
+
 
 void dflat_open_read() {
 #ifdef DFLATSER
   Serial.print("Read filename: ");
 #endif
   dflat_get_filename();
-  myFile = SD.open(dflat_fname,FILE_READ);
+  strcpy(dflat_fqname,path);
+  strcat(dflat_fqname,dflat_fname);
+#ifdef DFLATSER
+  Serial.print("FQ filename: ");
+  Serial.println(dflat_fqname);
+#endif
+  myFile = SD.open(dflat_fqname,FILE_READ);
   if (!myFile) {
 #ifdef DFLATSER
     Serial.println("File Error");
@@ -261,7 +312,14 @@ void dflat_open_read() {
     state=dflat_initialise;
     return;
   } 
-  state=dflat_load_byte;
+#ifdef DFLATSER
+  Serial.print("SD card name: ");
+  Serial.println(myFile.name());
+#endif
+  if (myFile.isDirectory())
+    state=dflat_send_cr;
+  else
+    state=dflat_load_byte;
 }
 
 void dflat_open_write() {
@@ -269,9 +327,11 @@ void dflat_open_write() {
   Serial.print("Write filename: ");
 #endif
   dflat_get_filename();
-  if(SD.exists(dflat_fname))
-    SD.remove(dflat_fname);
-  myFile = SD.open(dflat_fname,O_CREAT|O_WRITE);
+  strcpy(dflat_fqname,path);
+  strcat(dflat_fqname,dflat_fname);
+  if(SD.exists(dflat_fqname))
+    SD.remove(dflat_fqname);
+  myFile = SD.open(dflat_fqname,O_CREAT|O_WRITE);
   if (!myFile) {
 #ifdef DFLATSER
     Serial.println("File Error");
@@ -319,11 +379,12 @@ void dflat_directory() {
   char dirStr[40];
   BUSY;
 
-  dir=SD.open("/");     // Always just show the root folder - simples
+  dir=SD.open(path);     // Current path
   dir.rewindDirectory();
 
 #ifdef DFLATSER
-  Serial.println("Directory");
+  Serial.print("Directory ");
+  Serial.println(path);
 #endif
   while (true) {
     BUSY;
@@ -332,7 +393,8 @@ void dflat_directory() {
       // no more files
       break;
     }
-    if (!myFile.isDirectory()) {
+//    if (!myFile.isDirectory()) {
+    if (1) {
       sprintf(dirStr,"%-13s%-5u ",myFile.name(),(unsigned int)myFile.size());
       char *ptr=dirStr;
       while(*ptr!=0) {
@@ -358,8 +420,10 @@ void dflat_delete() {
   Serial.println("Delete");
 #endif
   dflat_get_filename();
+  strcpy(dflat_fqname,path);
+  strcat(dflat_fqname,dflat_fname);
   BUSY;
-  if(!SD.exists(dflat_fname)) {
+  if(!SD.exists(dflat_fqname)) {
 #ifdef DFLATSER
     Serial.println("File Error");
 #endif
@@ -367,7 +431,7 @@ void dflat_delete() {
     delay(500);
     return;
   }
-  SD.remove(dflat_fname);
+  SD.remove(dflat_fqname);
   READY;
   state=dflat_initialise;
 }
@@ -429,6 +493,7 @@ void setup() {
 #ifdef DFLATSER
   Serial.println("initialization done.");
 #endif
+  strcpy(path, "/");
 }
 
 void loop(void) {
