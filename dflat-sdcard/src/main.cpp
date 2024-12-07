@@ -395,7 +395,10 @@ void dflat_directory() {
     }
 //    if (!myFile.isDirectory()) {
     if (1) {
-      sprintf(dirStr,"%-13s%-5u ",myFile.name(),(unsigned int)myFile.size());
+      if (myFile.isDirectory())
+        sprintf(dirStr,"%-13s%-5s ",myFile.name(),"<DIR>");
+      else
+        sprintf(dirStr,"%-13s%-5u ",myFile.name(),(unsigned int)myFile.size());
       char *ptr=dirStr;
       while(*ptr!=0) {
         char c=*ptr++;
